@@ -21,6 +21,7 @@ import MobileStation from "./component/mobile/MobileStation";
 import MobilePrintStation from "./component/mobile/MobileStation";
 import TrayId from "./component/wh/TrayId";
 import FinishingTrayId from "./component/wh/FinishingTrayId";
+import KeyencePage from "./component/keyence/KeyencePage";
 
 function App() {
   const isAdminMode = process.env.REACT_APP_DEPLOYMENT_MODE === "ADMIN";
@@ -71,6 +72,8 @@ function App() {
         {isRegularMode && (
           <Route path="/PrintStation" element={<PrintStation />} />
         )}
+
+        <Route path="/keyence" element={<KeyencePage />} />
 
         <Route path="*" index element={<Login />} />
       </Routes>

@@ -1,0 +1,136 @@
+.keyence-shell {
+  max-width: 480px;
+  min-height: 800px;
+  margin: 0 auto;
+  padding: 10px;
+  background: #f5f7fb;
+  color: #111;
+  font-family: Arial, sans-serif;
+}
+
+.keyence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.keyence-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.keyence-header p {
+  margin: 0;
+  color: #444;
+  font-size: 0.9rem;
+}
+
+.keyence-status-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.keyence-status-cards > div {
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.9rem;
+  border: 1px solid #e2e8f0;
+}
+
+.keyence-panel {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+}
+
+.keyence-list {
+  display: grid;
+  gap: 8px;
+  max-height: 540px;
+  overflow-y: auto;
+}
+
+.keyence-btn {
+  min-height: 52px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: #1d4ed8;
+  color: white;
+}
+
+.keyence-btn-secondary {
+  background: #64748b;
+}
+
+.keyence-list-btn {
+  text-align: left;
+}
+
+.keyence-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  box-sizing: border-box;
+}
+
+.keyence-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.keyence-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.keyence-status {
+  margin: 6px 0 10px;
+  font-weight: 600;
+}
+
+.keyence-planogram {
+  max-height: 320px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.keyence-pill {
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.keyence-pill.complete {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.keyence-success {
+  color: #166534;
+  font-weight: 600;
+}
+
+.keyence-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
