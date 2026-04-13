@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="800" viewBox="0 0 480 800">
+  <rect width="480" height="800" fill="#f5f7fb"/>
+  <text x="16" y="34" font-family="Arial" font-size="28" font-weight="700" fill="#111">Keyence Scanner</text>
+  <text x="16" y="56" font-family="Arial" font-size="14" fill="#444">Portrait workflow • 480x800 optimized</text>
+  <rect x="370" y="14" width="94" height="52" rx="8" fill="#64748b"/>
+  <text x="397" y="45" font-family="Arial" font-size="18" font-weight="700" fill="#fff">Reset</text>
+  <rect x="16" y="76" width="216" height="38" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <rect x="240" y="76" width="216" height="38" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <rect x="16" y="120" width="216" height="38" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <rect x="240" y="120" width="216" height="38" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <text x="26" y="100" font-family="Arial" font-size="13" fill="#111">WO: WO-20260317-01</text>
+  <text x="250" y="100" font-family="Arial" font-size="13" fill="#111">Kit: GC1DMF2430</text>
+  <text x="26" y="144" font-family="Arial" font-size="13" fill="#111">Station: 2</text>
+  <text x="250" y="144" font-family="Arial" font-size="13" fill="#111">Tray: T4-000123</text>
+  <rect x="16" y="170" width="448" height="610" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <text x="28" y="206" font-family="Arial" font-size="28" font-weight="700" fill="#111">Step 4 — Contact Scan</text>
+
+<rect x="28" y="236" width="424" height="48" rx="8" fill="#fff" stroke="#cbd5e1"/>
+<text x="40" y="266" font-family="Arial" font-size="16" fill="#444">Scan barcode</text>
+<rect x="28" y="294" width="210" height="48" rx="8" fill="#fff" stroke="#cbd5e1"/>
+<rect x="242" y="294" width="210" height="48" rx="8" fill="#fff" stroke="#cbd5e1"/>
+<text x="40" y="324" font-family="Arial" font-size="16" fill="#444">UPC</text>
+<text x="254" y="324" font-family="Arial" font-size="16" fill="#444">Expiration</text>
+<rect x="28" y="352" width="424" height="48" rx="8" fill="#fff" stroke="#cbd5e1"/>
+<text x="40" y="382" font-family="Arial" font-size="16" fill="#444">Lot</text>
+<rect x="28" y="412" width="206" height="52" rx="8" fill="#64748b"/>
+<rect x="246" y="412" width="206" height="52" rx="8" fill="#1d4ed8"/>
+<text x="109" y="444" font-family="Arial" font-size="18" font-weight="700" fill="#fff">Back</text>
+<text x="289" y="444" font-family="Arial" font-size="18" font-weight="700" fill="#fff">Submit Scan</text>
+<text x="28" y="478" font-family="Arial" font-size="16" font-weight="700" fill="#111">Status: Scan accepted</text>
+<rect x="28" y="512" width="424" height="44" rx="8" fill="#dcfce7" stroke="#86efac"/>
+<rect x="28" y="564" width="424" height="44" rx="8" fill="#f8fafc" stroke="#dbeafe"/>
+<rect x="28" y="616" width="424" height="44" rx="8" fill="#f8fafc" stroke="#dbeafe"/>
+<text x="40" y="539" font-family="Arial" font-size="13" fill="#111">TSM1DMFN86-0350HI</text><text x="396" y="539" font-family="Arial" font-size="13" fill="#111">2/2</text>
+<text x="40" y="591" font-family="Arial" font-size="13" fill="#111">TSM1DMFN86-0325HI</text><text x="396" y="591" font-family="Arial" font-size="13" fill="#111">1/2</text>
+<text x="40" y="643" font-family="Arial" font-size="13" fill="#111">TSM1DMFN86-0300HI</text><text x="396" y="643" font-family="Arial" font-size="13" fill="#111">0/2</text>
+
+</svg>

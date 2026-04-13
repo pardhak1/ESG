@@ -78,6 +78,8 @@ function App() {
           <Route path="/PrintStation" element={<PrintStation />} />
         )}
 
+        <Route path="/keyence" element={<KeyencePage />} />
+
         <Route path="*" index element={<Login />} />
       </Routes>
     </>
