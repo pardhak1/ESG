@@ -75,7 +75,7 @@ export default function SignIn() {
       const getLocalStorageData = localStorage.getItem('data')
 
       if (getLocalStorageData !== "") {
-        window.location.href = '/dashboars'
+        window.location.href = '/activeordersMobile'
       } else {
         window.location.href = '/'
       }

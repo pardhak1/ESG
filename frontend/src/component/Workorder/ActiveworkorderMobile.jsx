@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import "../Workorder/active.scss"
 import { useNavigate } from 'react-router-dom';
 import HandymanIcon from '@mui/icons-material/Handyman';
-import { AppBar, Toolbar, Typography, Grid, Box } from '@mui/material';
+import { AppBar, Toolbar, Typography, Grid, Box, Stack } from '@mui/material';
 
 
 
@@ -49,7 +49,7 @@ export const ActiveworkorderMobile = () => {
     localStorage.setItem('kit_code',e.kit_code);
     localStorage.setItem('WorkOrder',e.work_order)
     localStorage.setItem('workorder_id',e.wo_id)
-    navigate('/mobile')
+    navigate('/keyence/station')
     //alert(e.kit_code)
     const postData = {
       key1: `${e}`,
@@ -94,20 +94,22 @@ export const ActiveworkorderMobile = () => {
 </AppBar>
 <Typography  align="center" variant="h5">Active Work Orders/ ÓRDENES DE TRABAJO ACTIVAS </Typography>
 
-          <div className='Active_orders'>
-          {/* {          activeOrderList.map((e,index) => {
-            return <li key={index} value={e} onClick={(e) => getKitCode(e)}>{e}</li>
-          })} */}
-          {workOrder.map((e,index) => {
-            return (
-         <li key={index} onClick={() =>getKitCode(e)}>{e.work_order}</li>
-
- 
-          )
-          })}
-            
-           
-          </div>
+          <Box sx={{ p: 2 }}>
+            <Stack spacing={1.5}>
+              {workOrder.map((e, index) => (
+                <Button
+                  key={index}
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  sx={{ py: 1.8, fontSize: '1.2rem', textTransform: 'none' }}
+                  onClick={() => getKitCode(e)}
+                >
+                  {e.work_order}
+                </Button>
+              ))}
+            </Stack>
+          </Box>
           
         </Box>
       );
