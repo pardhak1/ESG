@@ -6,6 +6,14 @@
   background: #f5f7fb;
   color: #111;
   font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.keyence-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .keyence-header {
@@ -13,17 +21,32 @@
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: #1d4ed8;
+  color: white;
+  border-radius: 8px;
+}
+
+.keyence-header-content {
+  flex: 1;
 }
 
 .keyence-header h1 {
   margin: 0;
   font-size: 1.4rem;
+  font-weight: bold;
 }
 
-.keyence-header p {
-  margin: 0;
-  color: #444;
-  font-size: 0.9rem;
+.keyence-step-counter {
+  margin: 4px 0 0;
+  color: #dbeafe;
+  font-size: 0.85rem;
+}
+
+.keyence-btn-reset {
+  background: #dc2626;
+  white-space: nowrap;
 }
 
 .keyence-status-cards {
@@ -85,6 +108,19 @@
   box-sizing: border-box;
 }
 
+.keyence-input-large {
+  min-height: 56px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.keyence-instruction {
+  margin: 8px 0;
+  font-size: 0.95rem;
+  color: #475569;
+  font-weight: 500;
+}
+
 .keyence-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -133,4 +169,167 @@
 .keyence-error {
   color: #b91c1c;
   font-weight: 600;
+}
+
+.keyence-completion {
+  padding: 16px;
+  border-radius: 8px;
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  margin-bottom: 12px;
+}
+
+// Tray Grid Container
+.keyence-tray-grid-container {
+  margin-top: 12px;
+  padding: 8px;
+  background: #f5f7fb;
+  border-radius: 8px;
+}
+
+.keyence-grid-legend {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.legend-empty,
+.legend-unscanned,
+.legend-complete {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  margin-right: 4px;
+  border: 1px solid #ccc;
+}
+
+.legend-empty {
+  background: #fff;
+}
+
+.legend-unscanned {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.legend-complete {
+  background: #86efac;
+  border-color: #22c55e;
+}
+
+// Main Grid
+.keyence-tray-grid {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+}
+
+// Grid Cells
+.keyence-grid-cell {
+  aspect-ratio: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: bold;
+  background: #fff;
+  cursor: pointer;
+  min-height: 28px;
+  position: relative;
+  transition: all 0.15s;
+  overflow: hidden;
+}
+
+.keyence-grid-cell:hover {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 4px rgba(29, 78, 216, 0.3);
+}
+
+.keyence-grid-cell:active {
+  transform: scale(0.95);
+}
+
+// Cell States
+.keyence-cell-empty {
+  background: #fafafa;
+  border-color: #f0f0f0;
+  color: #999;
+  cursor: default;
+}
+
+.keyence-cell-empty:hover {
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.keyence-cell-unscanned {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.keyence-cell-partial {
+  background: #fef08a;
+  border-color: #eab308;
+  color: #713f12;
+}
+
+.keyence-cell-complete {
+  background: #86efac;
+  border-color: #22c55e;
+  color: #166534;
+}
+
+.keyence-grid-cell.selected {
+  border: 2px solid #1d4ed8;
+  box-shadow: 0 0 8px rgba(29, 78, 216, 0.5);
+  z-index: 10;
+}
+
+.cell-text {
+  display: block;
+  line-height: 1;
+}
+
+.cell-tooltip {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #fff;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
+}
+
+// Responsive adjustments for different tray sizes
+@media (max-width: 480px) {
+  .keyence-tray-grid {
+    gap: 2px;
+    max-height: 350px;
+  }
+
+  .keyence-grid-cell {
+    min-height: 24px;
+    font-size: 0.6rem;
+  }
+
+  .keyence-grid-legend {
+    font-size: 0.75rem;
+  }
 }

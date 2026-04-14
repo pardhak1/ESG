@@ -1,22 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-function toCountMap(planogramRows, scanInfo) {
-  const expected = {};
-  const scanned = {};
-
-  (planogramRows || []).forEach((row) => {
-    if (!row.lens_desc) return;
-    expected[row.lens_desc] = (expected[row.lens_desc] || 0) + 1;
-  });
-
-  (scanInfo || []).forEach((scan) => {
-    if (!scan.lens_desc) return;
-    scanned[scan.lens_desc] = (scanned[scan.lens_desc] || 0) + 1;
-  });
-
-  return { expected, scanned };
-}
-
 function parseBarcode(raw) {
   if (!raw) return { upc: '', exp: '', lotNum: '' };
   if (raw.substring(0, 2) === '01') {
@@ -36,14 +19,83 @@ function parseBarcode(raw) {
   return { upc: raw, exp: '', lotNum: '' };
 }
 
+// Detect tray dimensions from planogram (3x18, 3x21, 13x25)
+function detectTrayDimensions(planogramRows) {
+  if (!planogramRows || planogramRows.length === 0) {
+    return { cols: 3, rows: 18 };
+  }
+
+  const maxCol = Math.max(...planogramRows.map((p) => p.pos_col || 0));
+  const maxRow = Math.max(...planogramRows.map((p) => p.pos_row || 0));
+
+  return { cols: maxCol, rows: maxRow };
+}
+
+// Build 2D grid with scanned status at each position
+function buildTrayGrid(planogramRows, scanInfo) {
+  const { cols, rows } = detectTrayDimensions(planogramRows);
+
+  // Create position map
+  const positionMap = {};
+  (planogramRows || []).forEach((p) => {
+    const key = `${p.pos_col}-${p.pos_row}`;
+    if (!positionMap[key]) {
+      positionMap[key] = {
+        col: p.pos_col,
+        row: p.pos_row,
+        lensDesc: p.lens_desc,
+        lensUpc: p.lens_upc,
+        hasLens: true,
+        scannedCount: 0,
+        totalNeeded: 0,
+      };
+    }
+    positionMap[key].totalNeeded += 1;
+  });
+
+  // Count scanned items at each position
+  (scanInfo || []).forEach((scan) => {
+    const foundRow = planogramRows.find((p) => p.lens_desc === scan.lens_desc);
+    if (foundRow) {
+      const key = `${foundRow.pos_col}-${foundRow.pos_row}`;
+      if (positionMap[key]) {
+        positionMap[key].scannedCount += 1;
+      }
+    }
+  });
+
+  // Build grid array
+  const grid = [];
+  for (let r = 1; r <= rows; r++) {
+    const rowData = [];
+    for (let c = 1; c <= cols; c++) {
+      const key = `${c}-${r}`;
+      const cellData = positionMap[key] || {
+        col: c,
+        row: r,
+        hasLens: false,
+        scannedCount: 0,
+        totalNeeded: 0,
+      };
+      rowData.push(cellData);
+    }
+    grid.push(rowData);
+  }
+
+  return { grid, cols, rows };
+}
+
 export default function KeyenceScanStep({ onBack }) {
   const [planogram, setPlanogram] = useState([]);
-  const [counts, setCounts] = useState({ expected: {}, scanned: {} });
+  const [grid, setGrid] = useState([]);
+  const [gridDims, setGridDims] = useState({ cols: 3, rows: 18 });
   const [scanRaw, setScanRaw] = useState('');
   const [upc, setUpc] = useState('');
   const [expDate, setExpDate] = useState('');
   const [lotNum, setLotNum] = useState('');
   const [status, setStatus] = useState('Ready to scan.');
+  const [isComplete, setIsComplete] = useState(false);
+  const [selectedCell, setSelectedCell] = useState(null);
   const inputRef = useRef(null);
 
   const scanSession = useMemo(() => {
@@ -53,6 +105,17 @@ export default function KeyenceScanStep({ onBack }) {
       return {};
     }
   }, []);
+
+  // Check if tray is complete
+  const checkCompletion = () => {
+    if (grid.length === 0) return false;
+    return grid.every((row) =>
+      row.every((cell) => {
+        if (!cell.hasLens) return true;
+        return cell.scannedCount >= cell.totalNeeded;
+      })
+    );
+  };
 
   useEffect(() => {
     const kitCode = localStorage.getItem('kit_code');
@@ -68,7 +131,11 @@ export default function KeyenceScanStep({ onBack }) {
         const rows = data.data || [];
         setPlanogram(rows);
         localStorage.setItem('Planogram', JSON.stringify(rows));
-        setCounts(toCountMap(rows, scanSession.scanInfo || []));
+
+        const { grid: newGrid, cols, rows: numRows } = buildTrayGrid(rows, scanSession.scanInfo || []);
+        setGrid(newGrid);
+        setGridDims({ cols, rows: numRows });
+        setIsComplete(checkCompletion());
       })
       .catch(() => setStatus('Unable to load tray grid.'));
   }, [scanSession.scanInfo]);
@@ -92,7 +159,11 @@ export default function KeyenceScanStep({ onBack }) {
       .then((data) => {
         if (data.success === 1) {
           localStorage.setItem('scanSession', JSON.stringify(data));
-          setCounts(toCountMap(planogram, data.scanInfo || []));
+
+          const { grid: newGrid } = buildTrayGrid(planogram, data.scanInfo || []);
+          setGrid(newGrid);
+          setIsComplete(checkCompletion());
+
           if (typeof data.currentScanCount !== 'undefined') {
             localStorage.setItem('nLens', data.currentScanCount);
           }
@@ -104,34 +175,57 @@ export default function KeyenceScanStep({ onBack }) {
     const kitCode = localStorage.getItem('kit_code');
     const station = localStorage.getItem('Station');
     const trayNumber = localStorage.getItem('trayNumber');
+    const sanitizedUpc = upc.trim();
 
-    if (!upc) {
-      setStatus('UPC required');
+    // Validate UPC format before API call
+    if (!sanitizedUpc) {
+      setStatus('UPC required. Please scan or enter a barcode.');
+      console.error('[Keyence] [ScanStep] Validation: UPC is empty');
+      return;
+    }
+    
+    if (!/^\d+$/.test(sanitizedUpc)) {
+      setStatus('Invalid UPC format. UPC must contain only digits (0-9).');
+      console.error('[Keyence] [ScanStep] Validation: UPC contains non-numeric characters', { upc: sanitizedUpc });
+      return;
+    }
+    
+    if (sanitizedUpc.length < 8 || sanitizedUpc.length > 14) {
+      setStatus(`Invalid UPC length. Expected 8-14 digits, got ${sanitizedUpc.length}.`);
+      console.error('[Keyence] [ScanStep] Validation: UPC length out of range', { length: sanitizedUpc.length });
       return;
     }
 
     try {
+      const validateEndpoint = `api/scan/validate_scan/${sanitizedUpc}/${kitCode}/${trayNumber}/${station}`;
+      console.log('[Keyence] [ScanStep] API Call: GET /api/scan/validate_scan', { upc: sanitizedUpc, kitCode, trayNumber, station });
+      
       const validateResp = await fetch(
-        `${process.env.REACT_APP_BACKEND_HOST}/api/scan/validate_scan/${upc}/${kitCode}/${trayNumber}/${station}`,
+        `${process.env.REACT_APP_BACKEND_HOST}/${validateEndpoint}`,
         { method: 'GET' }
       );
 
       if (!validateResp.ok) {
         const fail = await validateResp.json();
-        setStatus(fail.message || 'Invalid scan');
+        console.error('[Keyence] [ScanStep] Validation failed:', fail, { upc: sanitizedUpc, status: validateResp.status });
+        setStatus(fail.message || `UPC not valid for this kit and station. Verify barcode and try again.`);
         return;
       }
+      
+      console.log('[Keyence] [ScanStep] Validation passed for UPC:', sanitizedUpc);
 
       const payload = {
-        upc,
+        upc: sanitizedUpc,
         exp: expDate || '0',
         lotnum: lotNum || '0',
         trayID: localStorage.getItem('trayLabel'),
-        barcode: scanRaw || upc,
-        unparsed: scanRaw || upc,
+        barcode: scanRaw || sanitizedUpc,
+        unparsed: scanRaw || sanitizedUpc,
         upcVerify: true,
       };
 
+      console.log('[Keyence] [ScanStep] API Call: POST /api/scan/submit_scan', { upc: sanitizedUpc, trayID: payload.trayID });
+      
       const submitResp = await fetch(`${process.env.REACT_APP_BACKEND_HOST}/api/scan/submit_scan/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,10 +234,12 @@ export default function KeyenceScanStep({ onBack }) {
 
       if (!submitResp.ok) {
         const fail = await submitResp.json();
-        setStatus(fail.message || 'Scan submit failed');
+        console.error('[Keyence] [ScanStep] Submit failed:', fail, { upc: sanitizedUpc, status: submitResp.status });
+        setStatus(fail.message || `Scan rejected. ${fail.message ? '' : 'Verify barcode is valid for this tray and try again.'}`);
         return;
       }
 
+      console.log('[Keyence] [ScanStep] Scan submitted successfully:', { upc: sanitizedUpc });
       setStatus('Scan accepted');
       setScanRaw('');
       setUpc('');
@@ -152,48 +248,97 @@ export default function KeyenceScanStep({ onBack }) {
       refreshSessionCounts();
       if (inputRef.current) inputRef.current.focus();
     } catch (err) {
-      setStatus(err.message || 'Scan submit failed');
+      console.error('[Keyence] [ScanStep] Exception during submit:', err, { upc: sanitizedUpc });
+      setStatus(err.message || 'Network error submitting scan. Check your connection and try again.');
     }
   };
 
+  const getCellStatus = (cell) => {
+    if (!cell.hasLens) return 'empty';
+    if (cell.scannedCount === 0) return 'unscanned';
+    if (cell.scannedCount >= cell.totalNeeded) return 'complete';
+    return 'partial';
+  };
+
+  // Auto-focus on barcode input on mount and after each scan
+  useEffect(() => {
+    if (inputRef.current && !isComplete) {
+      inputRef.current.focus();
+    }
+  }, [isComplete, scanRaw]);
+
   return (
     <div className="keyence-panel">
-      <h2>Scan Lenses</h2>
-      <input
-        ref={inputRef}
-        className="keyence-input"
-        value={scanRaw}
-        onChange={(e) => setScanRaw(e.target.value.trim())}
-        onKeyDown={(e) => e.key === 'Enter' && submitScan()}
-        placeholder="Scan barcode"
-        autoFocus
-      />
-      <div className="keyence-grid-2">
-        <input className="keyence-input" value={upc} onChange={(e) => setUpc(e.target.value.trim())} placeholder="UPC" />
-        <input className="keyence-input" value={expDate} onChange={(e) => setExpDate(e.target.value.trim())} placeholder="Expiration" />
-      </div>
-      <input className="keyence-input" value={lotNum} onChange={(e) => setLotNum(e.target.value.trim())} placeholder="Lot" />
+      <h2>Scan Lenses - Tray {localStorage.getItem('trayLabel')}</h2>
 
-      <div className="keyence-actions">
-        <button className="keyence-btn keyence-btn-secondary" onClick={onBack}>Back</button>
-        <button className="keyence-btn" onClick={submitScan}>Submit Scan</button>
+      {/* 2D Tray Grid - Always visible */}
+      <div className="keyence-tray-grid-container">
+        <div className="keyence-grid-legend">
+          <span><span className="legend-empty"></span> No Lens</span>
+          <span><span className="legend-unscanned"></span> Needed</span>
+          <span><span className="legend-complete"></span> Scanned</span>
+        </div>
+
+        <div className="keyence-tray-grid" style={{ gridTemplateColumns: `repeat(${gridDims.cols}, 1fr)` }}>
+          {grid.map((row, rowIdx) =>
+            row.map((cell, colIdx) => {
+              const status = getCellStatus(cell);
+              const key = `${cell.col}-${cell.row}`;
+
+              return (
+                <div
+                  key={key}
+                  className={`keyence-grid-cell keyence-cell-${status}`}
+                  title={cell.hasLens ? `Pos ${cell.col}-${cell.row}: ${cell.lensDesc || 'Lens'}\n${cell.scannedCount}/${cell.totalNeeded}` : 'No lens at this position'}
+                >
+                  {cell.hasLens && <span className="cell-count">{cell.scannedCount}/{cell.totalNeeded}</span>}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
-      <p className="keyence-status">{status}</p>
+      {!isComplete ? (
+        <>
+          <p className="keyence-instruction">Scan lens barcodes below:</p>
+          <input
+            ref={inputRef}
+            className="keyence-input keyence-input-large"
+            value={scanRaw}
+            onChange={(e) => setScanRaw(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submitScan()}
+            placeholder="Scan barcode"
+          />
 
-      <div className="keyence-planogram">
-        {Object.keys(counts.expected).map((lensDesc) => {
-          const done = counts.scanned[lensDesc] || 0;
-          const target = counts.expected[lensDesc] || 0;
-          const complete = done >= target && target > 0;
-          return (
-            <div key={lensDesc} className={`keyence-pill ${complete ? 'complete' : ''}`}>
-              <span>{lensDesc}</span>
-              <strong>{done}/{target}</strong>
-            </div>
-          );
-        })}
-      </div>
+          <p className="keyence-status" style={{ color: status.includes('Scan accepted') ? '#22c55e' : status.includes('Invalid') || status.includes('failed') ? '#ef4444' : '#666' }}>
+            {status}
+          </p>
+
+          <div className="keyence-actions">
+            <button className="keyence-btn keyence-btn-secondary" onClick={onBack}>Back to Tray</button>
+            <button className="keyence-btn" onClick={submitScan}>Submit Scan</button>
+          </div>
+        </>
+      ) : (
+        <div className="keyence-completion">
+          <p style={{ fontSize: '1.2rem', color: '#22c55e', fontWeight: 'bold', textAlign: 'center', marginTop: '16px' }}>
+            ✓ TRAY COMPLETE
+          </p>
+          <p style={{ textAlign: 'center', color: '#666', marginBottom: '24px' }}>All lenses scanned successfully!</p>
+          <div className="keyence-actions">
+            <button className="keyence-btn keyence-btn-secondary" onClick={onBack}>Back to Tray</button>
+            <button className="keyence-btn keyence-btn-primary" onClick={() => {
+              localStorage.removeItem('trayLabel');
+              localStorage.removeItem('trayID');
+              localStorage.removeItem('trayNumber');
+              localStorage.removeItem('scanSession');
+              localStorage.removeItem('Planogram');
+              window.location.href = '/keyence';
+            }}>Done - Next Tray</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

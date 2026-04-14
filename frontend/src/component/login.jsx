@@ -72,7 +72,7 @@ export default function SignIn() {
       const getLocalStorageData = localStorage.getItem('data')
 
       if (getLocalStorageData !== "") {
-        window.location.href = '/dashboars'
+        window.location.href = '/keyence'
       } else {
         window.location.href = '/'
       }

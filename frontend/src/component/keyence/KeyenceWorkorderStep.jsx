@@ -6,13 +6,19 @@ export default function KeyenceWorkorderStep({ onContinue }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_BACKEND_HOST}/api/scan/getic`, { method: 'GET' })
+    const endpoint = `${process.env.REACT_APP_BACKEND_HOST}/api/scan/getic`;
+    console.log('[Keyence] [WorkorderStep] API Call: GET /api/scan/getic');
+    
+    fetch(endpoint, { method: 'GET' })
       .then((response) => response.json())
       .then((data) => {
+        const workOrderCount = (data.data || []).length;
+        console.log(`[Keyence] [WorkorderStep] API Response: status=200, success=${data.success}, ${workOrderCount} workorders loaded`);
         setWorkOrders(data.data || []);
         setLoading(false);
       })
       .catch((err) => {
+        console.error('[Keyence] [WorkorderStep] Error:', err, { endpoint });
         setError(err.message || 'Failed to load work orders');
         setLoading(false);
       });

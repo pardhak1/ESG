@@ -1,44 +1,105 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
+function parseTray(str) {
+  // Extract tray number from label format like "C1DMF2430-UPC-T4" -> "4"
+  const match = str.match(/T(\d+)/);
+  return match ? match[1] : null;
+}
 
 export default function KeyenceTrayStep({ onBack, onContinue }) {
   const [trayLabel, setTrayLabel] = useState(localStorage.getItem('trayLabel') || '');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
+
+  // Auto-focus on mount
+  useEffect(() => {
+    console.log('[Keyence] [TrayStep] Component mounted');
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   const submitTray = () => {
     const wsId = localStorage.getItem('Station');
-    if (!trayLabel) {
-      setMessage('Tray label is required');
+    const sanitizedLabel = trayLabel.trim();
+    
+    // Validate tray label format
+    if (!sanitizedLabel) {
+      setMessage('Tray label is required. Please scan or enter a tray label.');
+      console.error('[Keyence] [TrayStep] Validation: Tray label is empty');
+      return;
+    }
+    
+    if (sanitizedLabel.length > 50) {
+      setMessage('Tray label too long. Maximum 50 characters.');
+      console.error('[Keyence] [TrayStep] Validation: Tray label exceeds 50 characters', { length: sanitizedLabel.length });
+      return;
+    }
+    
+    // Check for invalid characters (allow alphanumeric, dash, underscore only)
+    if (!/^[a-zA-Z0-9-_]+$/.test(sanitizedLabel)) {
+      setMessage('Invalid tray label format. Use only letters, numbers, dash (-), or underscore (_).');
+      console.error('[Keyence] [TrayStep] Validation: Invalid characters in tray label', { label: sanitizedLabel });
       return;
     }
 
-    fetch(`${process.env.REACT_APP_BACKEND_HOST}/api/scan/trayid1/${trayLabel}/${wsId}`, {
+    setLoading(true);
+    const endpoint = `api/scan/trayid1/${sanitizedLabel}/${wsId}`;
+    console.log('[Keyence] [TrayStep] API Call: GET /api/scan/trayid1', { trayLabel: sanitizedLabel, wsId });
+    
+    fetch(`${process.env.REACT_APP_BACKEND_HOST}/${endpoint}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     })
       .then((response) => response.json())
       .then((data) => {
+        console.log('[Keyence] [TrayStep] API Response:', { success: data.success, trayInfo: data.trayInfo, currentScanCount: data.currentScanCount, maxTrayQty: data.maxTrayQty });
+        
         if (data.success !== 1) {
-          setMessage(data.message || 'Tray validation failed');
+          setMessage(data.message || 'Tray not found. Please verify the label and try again.');
+          console.error('[Keyence] [TrayStep] API returned success=0', { message: data.message });
+          setLoading(false);
           return;
         }
 
-        localStorage.setItem('scanSession', JSON.stringify(data));
-        localStorage.setItem('trayLabel', trayLabel);
-        if (data.trayInfo?.tray_number) {
-          localStorage.setItem('trayNumber', data.trayInfo.tray_number);
-        }
-        if (typeof data.maxTrayQty !== 'undefined') {
-          localStorage.setItem('lensGoal', data.maxTrayQty);
-        }
-        if (typeof data.currentScanCount !== 'undefined') {
-          localStorage.setItem('nLens', data.currentScanCount);
+        const storedWoId = parseInt(localStorage.getItem('workorder_id'));
+        const trayWoId = data.trayInfo?.wo_id;
+        
+        if (trayWoId !== storedWoId) {
+          setMessage(`Tray is for different work order. Expected WO ${storedWoId}, but tray belongs to WO ${trayWoId}.`);
+          console.error('[Keyence] [TrayStep] Workorder mismatch', { expected: storedWoId, actual: trayWoId });
+          setTrayLabel('');
+          setLoading(false);
+          return;
         }
 
-        setMessage('Tray loaded. Continue to scan.');
+        if (data.isFullyPopulated) {
+          setMessage(`Tray already complete. Scanned: ${data.currentScanCount}/${data.maxTrayQty}. Cannot scan into a fully populated tray.`);
+          console.warn('[Keyence] [TrayStep] Tray is fully populated', { currentScanCount: data.currentScanCount, maxTrayQty: data.maxTrayQty });
+          setTrayLabel('');
+          setLoading(false);
+          return;
+        }
+
+        // Store all required fields matching desktop version
+        localStorage.setItem('scanSession', JSON.stringify(data));
+        localStorage.setItem('trayLabel', sanitizedLabel);
+        localStorage.setItem('trayID', data.trayInfo?.wo_tray_id || '');
+        localStorage.setItem('trayNumber', parseTray(sanitizedLabel) || data.trayInfo?.tray_number || '');
+        localStorage.setItem('lensGoal', data.maxTrayQty || 0);
+        localStorage.setItem('nLens', data.currentScanCount || 0);
+        
+        console.log('[Keyence] [TrayStep] Tray validated and loaded', { trayLabel: sanitizedLabel, currentScans: data.currentScanCount, goal: data.maxTrayQty });
+
+        setLoading(false);
         onContinue();
       })
-      .catch((err) => setMessage(err.message || 'Tray validation failed'));
+      .catch((err) => {
+        console.error('[Keyence] [TrayStep] Fetch error:', err, { endpoint });
+        setMessage(err.message || 'Network error loading tray. Check your connection and try again.');
+        setLoading(false);
+      });
   };
 
   return (
@@ -47,16 +108,25 @@ export default function KeyenceTrayStep({ onBack, onContinue }) {
       <input
         ref={inputRef}
         className="keyence-input"
+        type="text"
         value={trayLabel}
-        onChange={(e) => setTrayLabel(e.target.value.trim())}
-        onKeyDown={(e) => e.key === 'Enter' && submitTray()}
+        onChange={(e) => setTrayLabel(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && !loading && submitTray()}
         placeholder="Scan tray barcode"
-        autoFocus
+        disabled={loading}
       />
-      {message && <p className={message.includes('loaded') ? 'keyence-success' : 'keyence-error'}>{message}</p>}
+      {message && (
+        <p className={message.includes('Tray already complete') || message.includes('different') ? 'keyence-error' : 'keyence-success'}>
+          {message}
+        </p>
+      )}
       <div className="keyence-actions">
-        <button className="keyence-btn keyence-btn-secondary" onClick={onBack}>Back</button>
-        <button className="keyence-btn" onClick={submitTray}>Continue</button>
+        <button className="keyence-btn keyence-btn-secondary" onClick={onBack} disabled={loading}>
+          Back
+        </button>
+        <button className="keyence-btn" onClick={submitTray} disabled={loading}>
+          {loading ? 'Loading...' : 'Continue'}
+        </button>
       </div>
     </div>
   );

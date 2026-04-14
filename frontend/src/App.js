@@ -21,9 +21,7 @@ import MobileStation from "./component/mobile/MobileStation";
 import MobilePrintStation from "./component/mobile/MobileStation";
 import TrayId from "./component/wh/TrayId";
 import FinishingTrayId from "./component/wh/FinishingTrayId";
-import KeyenceWorkstation from "./component/keyence/KeyenceWorkstation";
-import KeyenceTrayId from "./component/keyence/KeyenceTrayId";
-import KeyenceWh from "./component/keyence/KeyenceWh";
+import KeyencePage from "./component/keyence/KeyencePage";
 
 function App() {
   const isAdminMode = process.env.REACT_APP_DEPLOYMENT_MODE === "ADMIN";
@@ -62,9 +60,6 @@ function App() {
           <Route path="/FinishingTrayId" element={<FinishingTrayId />} />
         )}
         {isRegularMode && <Route path="/mobile" element={<MobileStation />} />}
-        {isRegularMode && <Route path="/keyence/station" element={<KeyenceWorkstation />} />}
-        {isRegularMode && <Route path="/keyence/trayid" element={<KeyenceTrayId />} />}
-        {isRegularMode && <Route path="/keyence/scan" element={<KeyenceWh />} />}
         {isRegularMode && (
           <Route
             path="/activeordersMobile"
@@ -78,6 +73,7 @@ function App() {
           <Route path="/PrintStation" element={<PrintStation />} />
         )}
 
+        {/* Keyence handheld scanner - available to all users */}
         <Route path="/keyence" element={<KeyencePage />} />
 
         <Route path="*" index element={<Login />} />

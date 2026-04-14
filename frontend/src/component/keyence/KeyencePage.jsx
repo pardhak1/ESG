@@ -25,12 +25,16 @@ export default function KeyencePage() {
   );
 
   const resetToWorkorders = () => {
+    // Clear all handheld scanner state
     localStorage.removeItem('WorkOrder');
     localStorage.removeItem('kit_code');
     localStorage.removeItem('workorder_id');
     localStorage.removeItem('Station');
     localStorage.removeItem('trayLabel');
+    localStorage.removeItem('trayID');
     localStorage.removeItem('trayNumber');
+    localStorage.removeItem('lensGoal');
+    localStorage.removeItem('nLens');
     localStorage.removeItem('scanSession');
     localStorage.removeItem('Planogram');
     setStep(STEP_WORKORDER);
@@ -39,42 +43,46 @@ export default function KeyencePage() {
   return (
     <div className="keyence-shell">
       <header className="keyence-header">
-        <div>
-          <h1>Keyence Scanner</h1>
-          <p>Portrait workflow • 480x800 optimized</p>
+        <div className="keyence-header-content">
+          <h1>📱 Scanner</h1>
+          <p className="keyence-step-counter">Step {step}/4</p>
         </div>
-        <button className="keyence-btn keyence-btn-secondary" onClick={resetToWorkorders}>
-          Reset
-        </button>
+        {step > 1 && (
+          <button className="keyence-btn keyence-btn-reset" onClick={resetToWorkorders}>
+            Reset
+          </button>
+        )}
       </header>
 
-      <section className="keyence-status-cards">
-        <div>WO: <strong>{context.workOrder || '-'}</strong></div>
-        <div>Kit: <strong>{context.kitCode || '-'}</strong></div>
-        <div>Station: <strong>{context.station || '-'}</strong></div>
-        <div>Tray: <strong>{context.trayLabel || '-'}</strong></div>
-      </section>
+      <main className="keyence-main">
+        <section className="keyence-status-cards">
+          <div>WO: <strong>{context.workOrder || '-'}</strong></div>
+          <div>Kit: <strong>{context.kitCode || '-'}</strong></div>
+          <div>Station: <strong>{context.station || '-'}</strong></div>
+          <div>Tray: <strong>{context.trayLabel || '-'}</strong></div>
+        </section>
 
-      {step === STEP_WORKORDER && (
-        <KeyenceWorkorderStep onContinue={() => setStep(STEP_STATION)} />
-      )}
-      {step === STEP_STATION && (
-        <KeyenceStationStep
-          onBack={() => setStep(STEP_WORKORDER)}
-          onContinue={() => setStep(STEP_TRAY)}
-        />
-      )}
-      {step === STEP_TRAY && (
-        <KeyenceTrayStep
-          onBack={() => setStep(STEP_STATION)}
-          onContinue={() => setStep(STEP_SCAN)}
-        />
-      )}
-      {step === STEP_SCAN && (
-        <KeyenceScanStep
-          onBack={() => setStep(STEP_TRAY)}
-        />
-      )}
+        {step === STEP_WORKORDER && (
+          <KeyenceWorkorderStep onContinue={() => setStep(STEP_STATION)} />
+        )}
+        {step === STEP_STATION && (
+          <KeyenceStationStep
+            onBack={() => setStep(STEP_WORKORDER)}
+            onContinue={() => setStep(STEP_TRAY)}
+          />
+        )}
+        {step === STEP_TRAY && (
+          <KeyenceTrayStep
+            onBack={() => setStep(STEP_STATION)}
+            onContinue={() => setStep(STEP_SCAN)}
+          />
+        )}
+        {step === STEP_SCAN && (
+          <KeyenceScanStep
+            onBack={() => setStep(STEP_TRAY)}
+          />
+        )}
+      </main>
     </div>
   );
 }

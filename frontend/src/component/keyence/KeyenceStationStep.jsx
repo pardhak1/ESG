@@ -7,22 +7,31 @@ export default function KeyenceStationStep({ onBack, onContinue }) {
 
   useEffect(() => {
     const kitCode = localStorage.getItem('kit_code');
-    fetch(`${process.env.REACT_APP_BACKEND_HOST}/api/scan/stationct/${kitCode}`, { method: 'GET' })
+    console.log('[Keyence] [StationStep] Component mounted with kitCode:', kitCode);
+    
+    const endpoint = `${process.env.REACT_APP_BACKEND_HOST}/api/scan/stationct/${kitCode}`;
+    console.log('[Keyence] [StationStep] API Call: GET /api/scan/stationct', { kitCode });
+    
+    fetch(endpoint, { method: 'GET' })
       .then((response) => {
-        if (!response.ok) throw new Error('Failed to load stations');
+        if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to load stations`);
         return response.json();
       })
       .then((data) => {
+        const stationCount = (data.data || []).length;
+        console.log(`[Keyence] [StationStep] API Response: status=200, ${stationCount} stations loaded`, { kitCode });
         setStations(data.data || []);
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message || 'Failed to load stations');
+        console.error('[Keyence] [StationStep] Error:', err, { kitCode, endpoint });
+        setError(`Failed to load stations for kit ${kitCode}. Check your network connection and try again.`);
         setLoading(false);
       });
   }, []);
 
   const chooseStation = (station) => {
+    console.log('[Keyence] [StationStep] User selected station:', { wsId: station.ws_id });
     localStorage.setItem('Station', String(station.ws_id));
     onContinue();
   };
@@ -43,7 +52,9 @@ export default function KeyenceStationStep({ onBack, onContinue }) {
           </button>
         ))}
       </div>
-      <button className="keyence-btn keyence-btn-secondary" onClick={onBack}>Back</button>
+      <div className="keyence-actions">
+        <button className="keyence-btn keyence-btn-secondary" onClick={onBack}>Back</button>
+      </div>
     </div>
   );
 }
