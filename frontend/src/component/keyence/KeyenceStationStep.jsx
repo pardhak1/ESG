@@ -7,40 +7,32 @@ export default function KeyenceStationStep({ onBack, onContinue }) {
 
   useEffect(() => {
     const kitCode = localStorage.getItem('kit_code');
-    console.log('[Keyence] [StationStep] Component mounted with kitCode:', kitCode);
-    
-    const endpoint = `${process.env.REACT_APP_BACKEND_HOST}/api/scan/stationct/${kitCode}`;
-    console.log('[Keyence] [StationStep] API Call: GET /api/scan/stationct', { kitCode });
-    
-    fetch(endpoint, { method: 'GET' })
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to load stations`);
-        return response.json();
+    fetch(`${process.env.REACT_APP_BACKEND_HOST}/api/scan/stationct/${kitCode}`, { method: 'GET' })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
       })
       .then((data) => {
-        const stationCount = (data.data || []).length;
-        console.log(`[Keyence] [StationStep] API Response: status=200, ${stationCount} stations loaded`, { kitCode });
         setStations(data.data || []);
         setLoading(false);
       })
       .catch((err) => {
-        console.error('[Keyence] [StationStep] Error:', err, { kitCode, endpoint });
-        setError(`Failed to load stations for kit ${kitCode}. Check your network connection and try again.`);
+        setError(`Failed to load stations: ${err.message}`);
         setLoading(false);
       });
   }, []);
 
   const chooseStation = (station) => {
-    console.log('[Keyence] [StationStep] User selected station:', { wsId: station.ws_id });
     localStorage.setItem('Station', String(station.ws_id));
     onContinue();
   };
 
+  if (loading) return <div className="keyence-panel"><p>Loading stations…</p></div>;
+  if (error)   return <div className="keyence-panel"><p className="keyence-error">{error}</p></div>;
+
   return (
     <div className="keyence-panel">
-      <h2>Select Station</h2>
-      {loading && <p>Loading stations...</p>}
-      {error && <p className="keyence-error">{error}</p>}
+      <h2>Stations</h2>
       <div className="keyence-list">
         {stations.map((s) => (
           <button

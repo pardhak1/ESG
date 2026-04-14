@@ -3,6 +3,7 @@ import KeyenceWorkorderStep from './KeyenceWorkorderStep';
 import KeyenceStationStep from './KeyenceStationStep';
 import KeyenceTrayStep from './KeyenceTrayStep';
 import KeyenceScanStep from './KeyenceScanStep';
+import logo from '../Images/esglogo.png';
 import './KeyencePage.scss';
 
 const STEP_WORKORDER = 1;
@@ -49,25 +50,30 @@ export default function KeyencePage() {
 
   return (
     <div className="keyence-shell">
-      <header className="keyence-header">
-        <div className="keyence-header-content">
-          <h1>📱 Scanner</h1>
-          <p className="keyence-step-counter">Step {step}/4</p>
-        </div>
+
+      {/* ── Branding header ── */}
+      <div className="keyence-brand-header">
+        <img src={logo} alt="Elevate Solutions Group" className="brand-logo" />
         {step > 1 && (
-          <button className="keyence-btn keyence-btn-reset" onClick={resetToWorkorders}>
-            Reset
-          </button>
+          <div className="brand-actions">
+            <button className="keyence-btn keyence-btn-reset" onClick={resetToWorkorders}>
+              Reset
+            </button>
+          </div>
         )}
-      </header>
+      </div>
 
       <main className="keyence-main">
-        <section className="keyence-status-cards">
-          <div>WO: <strong>{context.workOrder || '-'}</strong></div>
-          <div>Kit: <strong>{context.kitCode || '-'}</strong></div>
-          <div>Station: <strong>{context.station || '-'}</strong></div>
-          <div>Tray: <strong>{context.trayLabel || '-'}</strong></div>
-        </section>
+
+        {/* Context cards — hidden on step 1 */}
+        {step > 1 && (
+          <section className="keyence-status-cards">
+            <div>WO: <strong>{context.workOrder || '—'}</strong></div>
+            <div>Kit: <strong>{context.kitCode  || '—'}</strong></div>
+            <div>Station: <strong>{context.station   || '—'}</strong></div>
+            <div>Tray: <strong>{context.trayLabel || '—'}</strong></div>
+          </section>
+        )}
 
         {step === STEP_WORKORDER && (
           <KeyenceWorkorderStep onContinue={() => setStep(STEP_STATION)} />
@@ -85,10 +91,9 @@ export default function KeyencePage() {
           />
         )}
         {step === STEP_SCAN && (
-          <KeyenceScanStep
-            onBack={() => setStep(STEP_TRAY)}
-          />
+          <KeyenceScanStep onBack={() => setStep(STEP_TRAY)} />
         )}
+
       </main>
     </div>
   );
