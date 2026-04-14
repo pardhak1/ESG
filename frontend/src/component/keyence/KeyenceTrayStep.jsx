@@ -53,19 +53,20 @@ export default function KeyenceTrayStep({ onBack, onContinue }) {
       headers: { 'Content-Type': 'application/json' },
     })
       .then((response) => response.json())
-      .then((data) => {
-        console.log('[Keyence] [TrayStep] API Response:', { success: data.success, trayInfo: data.trayInfo, currentScanCount: data.currentScanCount, maxTrayQty: data.maxTrayQty });
-        
-        if (data.success !== 1) {
-          setMessage(data.message || 'Tray not found. Please verify the label and try again.');
-          console.error('[Keyence] [TrayStep] API returned success=0', { message: data.message });
+      .then((resp) => {
+        const payload = resp.data;
+        console.log('[Keyence] [TrayStep] API Response:', { success: resp.success, trayInfo: payload?.trayInfo, currentScanCount: payload?.currentScanCount, maxTrayQty: payload?.maxTrayQty });
+
+        if (resp.success !== 1) {
+          setMessage(resp.message || 'Tray not found. Please verify the label and try again.');
+          console.error('[Keyence] [TrayStep] API returned success=0', { message: resp.message });
           setLoading(false);
           return;
         }
 
         const storedWoId = parseInt(localStorage.getItem('workorder_id'));
-        const trayWoId = data.trayInfo?.wo_id;
-        
+        const trayWoId = payload?.trayInfo?.wo_id;
+
         if (trayWoId !== storedWoId) {
           setMessage(`Tray is for different work order. Expected WO ${storedWoId}, but tray belongs to WO ${trayWoId}.`);
           console.error('[Keyence] [TrayStep] Workorder mismatch', { expected: storedWoId, actual: trayWoId });
@@ -74,23 +75,23 @@ export default function KeyenceTrayStep({ onBack, onContinue }) {
           return;
         }
 
-        if (data.isFullyPopulated) {
-          setMessage(`Tray already complete. Scanned: ${data.currentScanCount}/${data.maxTrayQty}. Cannot scan into a fully populated tray.`);
-          console.warn('[Keyence] [TrayStep] Tray is fully populated', { currentScanCount: data.currentScanCount, maxTrayQty: data.maxTrayQty });
+        if (payload?.isFullyPopulated) {
+          setMessage(`Tray already complete. Scanned: ${payload.currentScanCount}/${payload.maxTrayQty}. Cannot scan into a fully populated tray.`);
+          console.warn('[Keyence] [TrayStep] Tray is fully populated', { currentScanCount: payload.currentScanCount, maxTrayQty: payload.maxTrayQty });
           setTrayLabel('');
           setLoading(false);
           return;
         }
 
         // Store all required fields matching desktop version
-        localStorage.setItem('scanSession', JSON.stringify(data));
+        localStorage.setItem('scanSession', JSON.stringify(payload));
         localStorage.setItem('trayLabel', sanitizedLabel);
-        localStorage.setItem('trayID', data.trayInfo?.wo_tray_id || '');
-        localStorage.setItem('trayNumber', parseTray(sanitizedLabel) || data.trayInfo?.tray_number || '');
-        localStorage.setItem('lensGoal', data.maxTrayQty || 0);
-        localStorage.setItem('nLens', data.currentScanCount || 0);
-        
-        console.log('[Keyence] [TrayStep] Tray validated and loaded', { trayLabel: sanitizedLabel, currentScans: data.currentScanCount, goal: data.maxTrayQty });
+        localStorage.setItem('trayID', payload?.trayInfo?.wo_tray_id || '');
+        localStorage.setItem('trayNumber', parseTray(sanitizedLabel) || payload?.trayInfo?.tray_number || '');
+        localStorage.setItem('lensGoal', payload?.maxTrayQty || 0);
+        localStorage.setItem('nLens', payload?.currentScanCount || 0);
+
+        console.log('[Keyence] [TrayStep] Tray validated and loaded', { trayLabel: sanitizedLabel, currentScans: payload?.currentScanCount, goal: payload?.maxTrayQty });
 
         setLoading(false);
         onContinue();

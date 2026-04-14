@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import KeyenceWorkorderStep from './KeyenceWorkorderStep';
 import KeyenceStationStep from './KeyenceStationStep';
 import KeyenceTrayStep from './KeyenceTrayStep';
@@ -12,6 +12,13 @@ const STEP_SCAN = 4;
 
 export default function KeyencePage() {
   const [step, setStep] = useState(STEP_WORKORDER);
+
+  // Clear any stale localStorage from a previous session on page load
+  useEffect(() => {
+    ['WorkOrder', 'kit_code', 'workorder_id', 'Station', 'trayLabel',
+     'trayID', 'trayNumber', 'lensGoal', 'nLens', 'scanSession', 'Planogram']
+      .forEach((key) => localStorage.removeItem(key));
+  }, []);
 
   const context = useMemo(
     () => ({

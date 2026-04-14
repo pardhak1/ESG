@@ -156,16 +156,17 @@ export default function KeyenceScanStep({ onBack }) {
       headers: { 'Content-Type': 'application/json' },
     })
       .then((r) => r.json())
-      .then((data) => {
-        if (data.success === 1) {
-          localStorage.setItem('scanSession', JSON.stringify(data));
+      .then((resp) => {
+        if (resp.success === 1) {
+          const payload = resp.data;
+          localStorage.setItem('scanSession', JSON.stringify(payload));
 
-          const { grid: newGrid } = buildTrayGrid(planogram, data.scanInfo || []);
+          const { grid: newGrid } = buildTrayGrid(planogram, payload.scanInfo || []);
           setGrid(newGrid);
           setIsComplete(checkCompletion());
 
-          if (typeof data.currentScanCount !== 'undefined') {
-            localStorage.setItem('nLens', data.currentScanCount);
+          if (typeof payload.currentScanCount !== 'undefined') {
+            localStorage.setItem('nLens', payload.currentScanCount);
           }
         }
       });
@@ -199,43 +200,56 @@ export default function KeyenceScanStep({ onBack }) {
     try {
       const validateEndpoint = `api/scan/validate_scan/${sanitizedUpc}/${kitCode}/${trayNumber}/${station}`;
       console.log('[Keyence] [ScanStep] API Call: GET /api/scan/validate_scan', { upc: sanitizedUpc, kitCode, trayNumber, station });
-      
+
       const validateResp = await fetch(
         `${process.env.REACT_APP_BACKEND_HOST}/${validateEndpoint}`,
         { method: 'GET' }
       );
+      const validateData = await validateResp.json();
 
-      if (!validateResp.ok) {
-        const fail = await validateResp.json();
-        console.error('[Keyence] [ScanStep] Validation failed:', fail, { upc: sanitizedUpc, status: validateResp.status });
-        setStatus(fail.message || `UPC not valid for this kit and station. Verify barcode and try again.`);
+      if (!validateResp.ok || validateData.success !== 1) {
+        console.error('[Keyence] [ScanStep] Validation failed:', validateData, { upc: sanitizedUpc, status: validateResp.status });
+        setStatus(validateData.message || 'UPC not valid for this kit and station. Verify barcode and try again.');
         return;
       }
-      
+
       console.log('[Keyence] [ScanStep] Validation passed for UPC:', sanitizedUpc);
 
-      const payload = {
+      // Determine which planogram slot to fill (matches IKB trackPosByLensUPC logic)
+      let currentSession = {};
+      try { currentSession = JSON.parse(localStorage.getItem('scanSession') || '{}'); } catch (e) {}
+      const existingCount = (currentSession.scanInfo || []).filter((s) => s.scan_upc === sanitizedUpc).length;
+      const planogramRows = validateData.data || [];
+      const posIdx = Math.min(existingCount, planogramRows.length - 1);
+      const targetPos = planogramRows[Math.max(0, posIdx)] || {};
+
+      const submitPayload = {
         upc: sanitizedUpc,
-        exp: expDate || '0',
+        expir: expDate || '0',
         lotnum: lotNum || '0',
-        trayID: localStorage.getItem('trayLabel'),
-        barcode: scanRaw || sanitizedUpc,
+        trayID: localStorage.getItem('trayID'),
+        kitcode: kitCode,
+        traynumber: trayNumber,
+        station: station,
+        pos: { row: targetPos.pos_row || 1, col: targetPos.pos_col || 1 },
         unparsed: scanRaw || sanitizedUpc,
-        upcVerify: true,
+        barcode: scanRaw || sanitizedUpc,
+        upcVerify: scanRaw.substring(0, 2) === '17' ||
+          (scanRaw.substring(0, 2) === '01' && scanRaw.includes(sanitizedUpc)),
       };
 
-      console.log('[Keyence] [ScanStep] API Call: POST /api/scan/submit_scan', { upc: sanitizedUpc, trayID: payload.trayID });
-      
+      console.log('[Keyence] [ScanStep] API Call: POST /api/scan/submit_scan', { upc: sanitizedUpc, trayID: submitPayload.trayID, pos: submitPayload.pos });
+
       const submitResp = await fetch(`${process.env.REACT_APP_BACKEND_HOST}/api/scan/submit_scan/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(submitPayload),
       });
 
       if (!submitResp.ok) {
         const fail = await submitResp.json();
         console.error('[Keyence] [ScanStep] Submit failed:', fail, { upc: sanitizedUpc, status: submitResp.status });
-        setStatus(fail.message || `Scan rejected. ${fail.message ? '' : 'Verify barcode is valid for this tray and try again.'}`);
+        setStatus(fail.message || 'Scan rejected. Verify barcode is valid for this tray and try again.');
         return;
       }
 
