@@ -221,33 +221,33 @@
   border-color: #22c55e;
 }
 
-// Main Grid
+// Main Grid — fixed height so all rows are visible without scrolling
 .keyence-tray-grid {
   display: grid;
-  gap: 3px;
-  padding: 8px;
+  gap: 2px;
+  padding: 6px;
   background: #fff;
   border-radius: 8px;
-  max-height: 400px;
-  overflow-y: auto;
   border: 1px solid #e2e8f0;
+  // height is set inline from gridDims so cells always fill the container
+  box-sizing: border-box;
 }
 
-// Grid Cells
+// Grid Cells — no fixed size; let grid layout determine dimensions
 .keyence-grid-cell {
-  aspect-ratio: 1;
   border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  border-radius: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
+  font-size: 0.55rem;
   font-weight: bold;
   background: #fff;
   cursor: pointer;
-  min-height: 28px;
+  min-height: 0;
+  min-width: 0;
   position: relative;
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s;
   overflow: hidden;
 }
 
@@ -317,18 +317,7 @@
   pointer-events: none;
 }
 
-// Responsive adjustments for different tray sizes
 @media (max-width: 480px) {
-  .keyence-tray-grid {
-    gap: 2px;
-    max-height: 350px;
-  }
-
-  .keyence-grid-cell {
-    min-height: 24px;
-    font-size: 0.6rem;
-  }
-
   .keyence-grid-legend {
     font-size: 0.75rem;
   }

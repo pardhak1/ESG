@@ -96,7 +96,9 @@ export default function KeyenceScanStep({ onBack }) {
   const [status, setStatus] = useState('Ready to scan.');
   const [isComplete, setIsComplete] = useState(false);
   const [selectedCell, setSelectedCell] = useState(null);
+  const [needsUpc, setNeedsUpc] = useState(false);
   const inputRef = useRef(null);
+  const upcInputRef = useRef(null);
 
   const scanSession = useMemo(() => {
     try {
@@ -143,9 +145,16 @@ export default function KeyenceScanStep({ onBack }) {
   useEffect(() => {
     if (!scanRaw) return;
     const parsed = parseBarcode(scanRaw);
-    setUpc(parsed.upc);
     setExpDate(parsed.exp);
     setLotNum(parsed.lotNum);
+    if (parsed.upc) {
+      setUpc(parsed.upc);
+      setNeedsUpc(false);
+    } else {
+      // Non-01 barcode (e.g. 17): has exp/lot but no UPC — prompt user to scan UPC separately
+      setUpc('');
+      setNeedsUpc(true);
+    }
   }, [scanRaw]);
 
   const refreshSessionCounts = () => {
@@ -259,6 +268,7 @@ export default function KeyenceScanStep({ onBack }) {
       setUpc('');
       setExpDate('');
       setLotNum('');
+      setNeedsUpc(false);
       refreshSessionCounts();
       if (inputRef.current) inputRef.current.focus();
     } catch (err) {
@@ -274,12 +284,19 @@ export default function KeyenceScanStep({ onBack }) {
     return 'partial';
   };
 
-  // Auto-focus on barcode input on mount and after each scan
+  // Auto-focus UPC input when a 17-barcode is scanned
   useEffect(() => {
-    if (inputRef.current && !isComplete) {
+    if (needsUpc && upcInputRef.current) {
+      upcInputRef.current.focus();
+    }
+  }, [needsUpc]);
+
+  // Auto-focus main barcode input on mount and after each scan (not when waiting for UPC)
+  useEffect(() => {
+    if (inputRef.current && !isComplete && !needsUpc) {
       inputRef.current.focus();
     }
-  }, [isComplete, scanRaw]);
+  }, [isComplete, scanRaw, needsUpc]);
 
   return (
     <div className="keyence-panel">
@@ -293,7 +310,14 @@ export default function KeyenceScanStep({ onBack }) {
           <span><span className="legend-complete"></span> Scanned</span>
         </div>
 
-        <div className="keyence-tray-grid" style={{ gridTemplateColumns: `repeat(${gridDims.cols}, 1fr)` }}>
+        <div
+          className="keyence-tray-grid"
+          style={{
+            gridTemplateColumns: `repeat(${gridDims.cols}, 1fr)`,
+            gridTemplateRows: `repeat(${gridDims.rows}, 1fr)`,
+            height: `${Math.max(160, Math.min(260, gridDims.rows * 14))}px`,
+          }}
+        >
           {grid.map((row, rowIdx) =>
             row.map((cell, colIdx) => {
               const status = getCellStatus(cell);
@@ -315,17 +339,34 @@ export default function KeyenceScanStep({ onBack }) {
 
       {!isComplete ? (
         <>
-          <p className="keyence-instruction">Scan lens barcodes below:</p>
+          <p className="keyence-instruction">
+            {needsUpc ? 'Barcode scanned. Now scan the UPC label:' : 'Scan lens barcode below:'}
+          </p>
+
+          {/* Step 1: main barcode — disabled after scanning a 17-type barcode */}
           <input
             ref={inputRef}
             className="keyence-input keyence-input-large"
             value={scanRaw}
             onChange={(e) => setScanRaw(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitScan()}
+            onKeyDown={(e) => e.key === 'Enter' && !needsUpc && submitScan()}
             placeholder="Scan barcode"
+            disabled={needsUpc}
           />
 
-          <p className="keyence-status" style={{ color: status.includes('Scan accepted') ? '#22c55e' : status.includes('Invalid') || status.includes('failed') ? '#ef4444' : '#666' }}>
+          {/* Step 2: UPC-only input — only shown for non-01 barcodes */}
+          {needsUpc && (
+            <input
+              ref={upcInputRef}
+              className="keyence-input keyence-input-large"
+              value={upc}
+              onChange={(e) => setUpc(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitScan()}
+              placeholder="Scan UPC barcode"
+            />
+          )}
+
+          <p className="keyence-status" style={{ color: status === 'Scan accepted' ? '#22c55e' : status !== 'Ready to scan.' ? '#ef4444' : '#666' }}>
             {status}
           </p>
 
