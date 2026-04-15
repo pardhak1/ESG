@@ -5,15 +5,8 @@ function parseTray(str) {
   return match ? match[1] : null;
 }
 
-const TRAY_TYPES = [
-  { label: '3x18  (54)',  value: '3x18'  },
-  { label: '3x21  (63)',  value: '3x21'  },
-  { label: '13x25 (325)', value: '13x25' },
-];
-
 export default function KeyenceTrayStep({ onBack, onContinue }) {
   const [trayLabel, setTrayLabel] = useState('');
-  const [trayType,  setTrayType]  = useState('');
   const [message,   setMessage]   = useState('');
   const [loading,   setLoading]   = useState(false);
   const inputRef = useRef(null);
@@ -94,18 +87,6 @@ export default function KeyenceTrayStep({ onBack, onContinue }) {
   return (
     <div className="keyence-panel">
       <h2>Scan Tray Label</h2>
-
-      <label className="keyence-field-label">Tray Type</label>
-      <select
-        className="keyence-select"
-        value={trayType}
-        onChange={(e) => setTrayType(e.target.value)}
-      >
-        <option value="">— Select tray type —</option>
-        {TRAY_TYPES.map((t) => (
-          <option key={t.value} value={t.value}>{t.label}</option>
-        ))}
-      </select>
 
       <label className="keyence-field-label">Tray Label</label>
       <input

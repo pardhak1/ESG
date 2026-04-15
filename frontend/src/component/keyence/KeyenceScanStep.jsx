@@ -17,7 +17,7 @@ function parseBarcode(raw) {
       lotNum: raw.substring(10),
     };
   }
-  return { upc: raw, exp: '', lotNum: '' };
+  return { upc: '', exp: '', lotNum: '' };
 }
 
 // ─── Tray grid helpers ────────────────────────────────────────────────────────
@@ -61,17 +61,17 @@ function buildTrayGrid(planogramRows, scanInfo) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function KeyenceScanStep({ onBack }) {
-  const [planogram, setPlanogram] = useState([]);
-  const [grid,      setGrid]      = useState([]);
-  const [gridDims,  setGridDims]  = useState({ cols: 3, rows: 18 });
-  const [scanRaw,   setScanRaw]   = useState('');
-  const [upc,       setUpc]       = useState('');
-  const [expDate,   setExpDate]   = useState('');
-  const [lotNum,    setLotNum]    = useState('');
-  const [needsUpc,  setNeedsUpc]  = useState(false);
-  const [status,    setStatus]    = useState('');
+  const [planogram,  setPlanogram]  = useState([]);
+  const [grid,       setGrid]       = useState([]);
+  const [gridDims,   setGridDims]   = useState({ cols: 3, rows: 18 });
+  const [scanRaw,    setScanRaw]    = useState('');
+  const [upc,        setUpc]        = useState('');
+  const [expDate,    setExpDate]    = useState('');
+  const [lotNum,     setLotNum]     = useState('');
+  const [needsUpc,   setNeedsUpc]   = useState(false);
+  const [status,     setStatus]     = useState('');
   const [isComplete, setIsComplete] = useState(false);
-  const [saveMsg,   setSaveMsg]   = useState('');
+  const [saveMsg,    setSaveMsg]    = useState('');
 
   const inputRef    = useRef(null);
   const upcInputRef = useRef(null);
@@ -120,30 +120,15 @@ export default function KeyenceScanStep({ onBack }) {
       .catch(() => setStatus('Unable to load tray grid.'));
   }, [scanSession.scanInfo]);
 
-  // ── Parse barcode when scanRaw changes ──────────────────────────────────────
-  useEffect(() => {
-    if (!scanRaw) return;
-    const parsed = parseBarcode(scanRaw);
-    setExpDate(parsed.exp);
-    setLotNum(parsed.lotNum);
-    if (parsed.upc) {
-      setUpc(parsed.upc);
-      setNeedsUpc(false);
-    } else {
-      setUpc('');
-      setNeedsUpc(true);
-    }
-  }, [scanRaw]);
-
   // ── Auto-focus UPC input when needed ────────────────────────────────────────
   useEffect(() => {
     if (needsUpc && upcInputRef.current) upcInputRef.current.focus();
   }, [needsUpc]);
 
-  // ── Auto-focus main input (not when waiting for UPC) ────────────────────────
+  // ── Auto-focus main input when ready ────────────────────────────────────────
   useEffect(() => {
     if (inputRef.current && !isComplete && !needsUpc) inputRef.current.focus();
-  }, [isComplete, scanRaw, needsUpc]);
+  }, [isComplete, needsUpc]);
 
   // ── Refresh grid from server after each scan ─────────────────────────────────
   const refreshGrid = () => {
@@ -165,12 +150,12 @@ export default function KeyenceScanStep({ onBack }) {
       });
   };
 
-  // ── Submit scan ──────────────────────────────────────────────────────────────
-  const submitScan = async () => {
+  // ── Core submit — receives values directly to avoid stale-state issues ───────
+  const doSubmit = async (submitUpc, submitExp, submitLot, submitRaw) => {
     const kitCode    = localStorage.getItem('kit_code');
     const station    = localStorage.getItem('Station');
     const trayNumber = localStorage.getItem('trayNumber');
-    const sanitizedUpc = upc.trim();
+    const sanitizedUpc = submitUpc.trim();
 
     if (!sanitizedUpc) { setStatus('UPC required.'); return; }
     if (!/^\d+$/.test(sanitizedUpc)) { setStatus('UPC must contain digits only.'); return; }
@@ -200,17 +185,17 @@ export default function KeyenceScanStep({ onBack }) {
 
       const body = {
         upc:        sanitizedUpc,
-        expir:      expDate  || '0',
-        lotnum:     lotNum   || '0',
+        expir:      submitExp  || '0',
+        lotnum:     submitLot  || '0',
         trayID:     localStorage.getItem('trayID'),
         kitcode:    kitCode,
         traynumber: trayNumber,
         station:    station,
         pos:        { row: targetPos.pos_row || 1, col: targetPos.pos_col || 1 },
-        unparsed:   scanRaw || sanitizedUpc,
-        barcode:    scanRaw || sanitizedUpc,
-        upcVerify:  scanRaw.substring(0, 2) === '17' ||
-                    (scanRaw.substring(0, 2) === '01' && scanRaw.includes(sanitizedUpc)),
+        unparsed:   submitRaw || sanitizedUpc,
+        barcode:    submitRaw || sanitizedUpc,
+        upcVerify:  submitRaw.substring(0, 2) === '17' ||
+                    (submitRaw.substring(0, 2) === '01' && submitRaw.includes(sanitizedUpc)),
       };
 
       const sResp = await fetch(`${process.env.REACT_APP_BACKEND_HOST}/api/scan/submit_scan/`, {
@@ -235,6 +220,31 @@ export default function KeyenceScanStep({ onBack }) {
     } catch (err) {
       setStatus(err.message || 'Network error. Check your connection.');
     }
+  };
+
+  // ── Called when Enter is pressed on the main barcode input ───────────────────
+  // Waits for the full barcode before doing anything.
+  const commitBarcode = () => {
+    if (!scanRaw) return;
+    const parsed = parseBarcode(scanRaw);
+    setExpDate(parsed.exp);
+    setLotNum(parsed.lotNum);
+
+    if (scanRaw.substring(0, 2) === '01') {
+      // Full data barcode — submit immediately, no second scan needed
+      setUpc(parsed.upc);
+      setNeedsUpc(false);
+      doSubmit(parsed.upc, parsed.exp, parsed.lotNum, scanRaw);
+    } else {
+      // Exp/lot only — show UPC field for second scan
+      setUpc('');
+      setNeedsUpc(true);
+    }
+  };
+
+  // ── Called when Enter is pressed on the UPC input ────────────────────────────
+  const submitUpcScan = () => {
+    doSubmit(upc, expDate, lotNum, scanRaw);
   };
 
   // ── Cell colour ──────────────────────────────────────────────────────────────
@@ -321,30 +331,28 @@ export default function KeyenceScanStep({ onBack }) {
         </div>
       </div>
 
-      {/* ── Scan input area ── */}
-      <label className="keyence-field-label">
-        {needsUpc ? 'Scan Contact UPC' : 'Contact UPC'}
-      </label>
-
+      {/* ── Barcode input (always shown, disabled while waiting for UPC) ── */}
+      <label className="keyence-field-label">Contact Barcode</label>
       <input
         ref={inputRef}
         className="keyence-input keyence-input-large"
         value={scanRaw}
         onChange={(e) => setScanRaw(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && !needsUpc && submitScan()}
+        onKeyDown={(e) => e.key === 'Enter' && !needsUpc && commitBarcode()}
         placeholder="Scan contact barcode"
         disabled={needsUpc}
       />
 
+      {/* ── UPC input — only appears for non-01 barcodes ── */}
       {needsUpc && (
         <>
-          <label className="keyence-field-label">Scan Contact UPC</label>
+          <label className="keyence-field-label">Scan Contact UPC (12 digits)</label>
           <input
             ref={upcInputRef}
             className="keyence-input keyence-input-large"
             value={upc}
             onChange={(e) => setUpc(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitScan()}
+            onKeyDown={(e) => e.key === 'Enter' && submitUpcScan()}
             placeholder="Scan UPC barcode"
           />
         </>
@@ -364,7 +372,12 @@ export default function KeyenceScanStep({ onBack }) {
 
       {/* ── Buttons ── */}
       <div className="keyence-actions" style={{ marginTop: 8 }}>
-        <button className="keyence-btn" onClick={submitScan}>Scan &amp; Register</button>
+        <button
+          className="keyence-btn"
+          onClick={needsUpc ? submitUpcScan : commitBarcode}
+        >
+          Scan &amp; Register
+        </button>
         <button className="keyence-btn keyence-btn-secondary" onClick={onBack}>New Tray</button>
       </div>
 
