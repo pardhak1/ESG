@@ -48,9 +48,9 @@ module.exports = {
     let insert_scan =
       "INSERT INTO `wo_scan` (`wo_scan_id`, `wo_tray_id`, `pcol`, `prow`, `scan_upc`, `exp_date`, `barcode`, `scan_date`, `lens_lot`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-    // Query to get lens description
+    // Query to get lens description and position
     let lens_desc =
-      "SELECT lens_desc FROM planogram WHERE lens_upc = ? AND kit_code = ? AND ws_number = ? AND tray_number = ?";
+      "SELECT lens_desc, pos_col, pos_row FROM planogram WHERE lens_upc = ? AND kit_code = ? AND ws_number = ? AND tray_number = ? ORDER BY pos_row ASC, pos_col ASC";
 
     // First, check the current scan count
     connection.query(check_scan_count, [upc, trayid], (error, countResults) => {
@@ -161,9 +161,9 @@ module.exports = {
     let traynum = req.params.trayNumber;
     let ws_id = req.params.station;
 
-    // Query to get lens description
+    // Query to get lens description and position
     let lens_desc =
-      "SELECT lens_desc FROM planogram WHERE lens_upc = ? AND kit_code = ? AND ws_number = ? AND tray_number = ?";
+      "SELECT lens_desc, pos_col, pos_row FROM planogram WHERE lens_upc = ? AND kit_code = ? AND ws_number = ? AND tray_number = ? ORDER BY pos_row ASC, pos_col ASC";
 
     // Now check if the lens is valid for this tray and station
     connection.query(

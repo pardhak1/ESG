@@ -31,23 +31,50 @@ function detectTrayDimensions(rows) {
 
 function buildTrayGrid(planogramRows, scanInfo) {
   const { cols, rows } = detectTrayDimensions(planogramRows);
+
+  // Build position map from planogram
   const posMap = {};
   (planogramRows || []).forEach((p) => {
     const key = `${p.pos_col}-${p.pos_row}`;
     if (!posMap[key]) {
-      posMap[key] = { col: p.pos_col, row: p.pos_row, lensDesc: p.lens_desc,
-                      lensUpc: p.lens_upc, hasLens: true, scannedCount: 0, totalNeeded: 0 };
+      posMap[key] = {
+        col: p.pos_col, row: p.pos_row,
+        lensDesc: p.lens_desc, lensUpc: p.lens_upc,
+        hasLens: true, scannedCount: 0, totalNeeded: 0,
+      };
     }
     posMap[key].totalNeeded += 1;
   });
+
+  // Count scans per lens_desc (matches how IKB desktop tracks progress)
+  const scanCountByDesc = {};
   (scanInfo || []).forEach((scan) => {
-    const col = scan.pcol;
-    const row = scan.prow;
-    if (col && row) {
-      const key = `${col}-${row}`;
-      if (posMap[key]) posMap[key].scannedCount += 1;
+    if (scan.lens_desc) {
+      scanCountByDesc[scan.lens_desc] = (scanCountByDesc[scan.lens_desc] || 0) + 1;
     }
   });
+
+  // Group planogram positions by lens_desc, sorted top-left → bottom-right
+  const posByDesc = {};
+  Object.values(posMap).forEach((pos) => {
+    if (!posByDesc[pos.lensDesc]) posByDesc[pos.lensDesc] = [];
+    posByDesc[pos.lensDesc].push(pos);
+  });
+  Object.values(posByDesc).forEach((arr) =>
+    arr.sort((a, b) => a.row - b.row || a.col - b.col)
+  );
+
+  // Fill scanned counts sequentially across positions for each lens_desc
+  Object.entries(scanCountByDesc).forEach(([desc, count]) => {
+    let remaining = count;
+    (posByDesc[desc] || []).forEach((pos) => {
+      const fill = Math.min(remaining, pos.totalNeeded);
+      pos.scannedCount = fill;
+      remaining -= fill;
+    });
+  });
+
+  // Build 2-D grid array
   const grid = [];
   for (let r = 1; r <= rows; r++) {
     const row = [];
@@ -60,46 +87,19 @@ function buildTrayGrid(planogramRows, scanInfo) {
   return { grid, cols, rows };
 }
 
-// ─── 13×25 scanning order ─────────────────────────────────────────────────────
-const SECTIONS_13x25 = [
-  { rowMin: 1,  rowMax: 13, colMin: 1,  colMax: 4,  label: 'Bottom-Left (13×4)'   },
-  { rowMin: 1,  rowMax: 13, colMin: 5,  colMax: 9,  label: 'Bottom-Middle (13×5)'  },
-  { rowMin: 1,  rowMax: 13, colMin: 10, colMax: 13, label: 'Bottom-Right (13×4)'   },
-  { rowMin: 14, rowMax: 25, colMin: 1,  colMax: 4,  label: 'Top-Left (12×4)'       },
-  { rowMin: 14, rowMax: 25, colMin: 5,  colMax: 9,  label: 'Top-Middle (12×5)'     },
-  { rowMin: 14, rowMax: 25, colMin: 10, colMax: 13, label: 'Top-Right (12×4)'      },
-];
-
-function buildExpectedOrder(planogramRows) {
-  const ordered = [];
-  SECTIONS_13x25.forEach((s) => {
-    const inSection = planogramRows
-      .filter((p) => p.pos_row >= s.rowMin && p.pos_row <= s.rowMax &&
-                     p.pos_col >= s.colMin && p.pos_col <= s.colMax)
-      .sort((a, b) => a.pos_row - b.pos_row || a.pos_col - b.pos_col);
-    inSection.forEach((p) =>
-      ordered.push({ col: p.pos_col, row: p.pos_row, section: s.label })
-    );
-  });
-  return ordered;
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function KeyenceScanStep({ onBack }) {
-  const [planogram,     setPlanogram]     = useState([]);
-  const [grid,          setGrid]          = useState([]);
-  const [gridDims,      setGridDims]      = useState({ cols: 3, rows: 18 });
-  const [scanRaw,       setScanRaw]       = useState('');
-  const [upc,           setUpc]           = useState('');
-  const [expDate,       setExpDate]       = useState('');
-  const [lotNum,        setLotNum]        = useState('');
-  const [needsUpc,      setNeedsUpc]      = useState(false);
-  const [status,        setStatus]        = useState('');
-  const [isComplete,    setIsComplete]    = useState(false);
-  const [saveMsg,       setSaveMsg]       = useState('');
-  const [expectedOrder, setExpectedOrder] = useState([]);
-  const [orderWarning,  setOrderWarning]  = useState('');
-  const [guideOpen,     setGuideOpen]     = useState(true);
+  const [planogram,  setPlanogram]  = useState([]);
+  const [grid,       setGrid]       = useState([]);
+  const [gridDims,   setGridDims]   = useState({ cols: 3, rows: 18 });
+  const [scanRaw,    setScanRaw]    = useState('');
+  const [upc,        setUpc]        = useState('');
+  const [expDate,    setExpDate]    = useState('');
+  const [lotNum,     setLotNum]     = useState('');
+  const [needsUpc,   setNeedsUpc]   = useState(false);
+  const [status,     setStatus]     = useState('');
+  const [isComplete, setIsComplete] = useState(false);
+  const [saveMsg,    setSaveMsg]    = useState('');
 
   const inputRef    = useRef(null);
   const upcInputRef = useRef(null);
@@ -126,23 +126,6 @@ export default function KeyenceScanStep({ onBack }) {
       row.every((cell) => !cell.hasLens || cell.scannedCount >= cell.totalNeeded)
     );
 
-  // ── Out-of-order check ───────────────────────────────────────────────────────
-  const checkOrder = (scanInfo, order) => {
-    if (!order.length) return;
-    const sorted = [...scanInfo].sort((a, b) => a.wo_scan_id - b.wo_scan_id);
-    for (let i = 0; i < sorted.length; i++) {
-      const expected = order[i];
-      if (!expected) break;
-      if (sorted[i].pcol !== expected.col || sorted[i].prow !== expected.row) {
-        setOrderWarning(
-          `Scan #${i + 1} is out of order — expected ${expected.section}, row ${expected.row}, col ${expected.col}.`
-        );
-        return;
-      }
-    }
-    setOrderWarning('');
-  };
-
   // ── Load planogram on mount ──────────────────────────────────────────────────
   useEffect(() => {
     const kitCode    = localStorage.getItem('kit_code');
@@ -161,12 +144,6 @@ export default function KeyenceScanStep({ onBack }) {
         setGrid(g);
         setGridDims({ cols, rows: numRows });
         setIsComplete(checkCompletion(g));
-
-        if (cols === 13 && numRows === 25) {
-          const order = buildExpectedOrder(rows);
-          setExpectedOrder(order);
-          checkOrder(scanSession.scanInfo || [], order);
-        }
       })
       .catch(() => setStatus('Unable to load tray grid.'));
   }, [scanSession.scanInfo]);
@@ -197,7 +174,6 @@ export default function KeyenceScanStep({ onBack }) {
           const { grid: g } = buildTrayGrid(planogram, payload.scanInfo || []);
           setGrid(g);
           setIsComplete(checkCompletion(g));
-          checkOrder(payload.scanInfo || [], expectedOrder);
         }
       });
   };
@@ -227,7 +203,8 @@ export default function KeyenceScanStep({ onBack }) {
         return;
       }
 
-      // Determine grid position (mirrors IKB trackPosByLensUPC)
+      // Determine grid position using planogram rows returned by validate_scan
+      // (now includes pos_col/pos_row after backend fix)
       let sess = {};
       try { sess = JSON.parse(localStorage.getItem('scanSession') || '{}'); } catch {}
       const existingCount = (sess.scanInfo || []).filter((s) => s.scan_upc === sanitizedUpc).length;
@@ -307,9 +284,6 @@ export default function KeyenceScanStep({ onBack }) {
   // ── Grid pixel height: scales with row count, capped 200–420 px ─────────────
   const gridHeight = Math.min(420, Math.max(200, gridDims.rows * 16));
 
-  // ── Is this a 13×25 tray? ────────────────────────────────────────────────────
-  const is13x25 = gridDims.cols === 13 && gridDims.rows === 25;
-
   // ─────────────────────────────────────────────────────────────────────────────
   if (isComplete) {
     return (
@@ -323,7 +297,6 @@ export default function KeyenceScanStep({ onBack }) {
           </p>
         </div>
 
-        {/* Grid — final state */}
         <div className="keyence-tray-grid-container">
           <div className="keyence-grid-legend">
             <span><span className="legend-swatch empty"></span>No lens</span>
@@ -383,26 +356,7 @@ export default function KeyenceScanStep({ onBack }) {
         </div>
       </div>
 
-      {/* ── 13×25 scanning order guide ── */}
-      {is13x25 && (
-        <div className="keyence-scan-guide">
-          <button className="keyence-guide-toggle" onClick={() => setGuideOpen((o) => !o)}>
-            Scan Order Guide {guideOpen ? '▲' : '▼'}
-          </button>
-          {guideOpen && (
-            <ol className="keyence-guide-list">
-              <li>Bottom-Left 13&times;4 &mdash; rows 1&ndash;13, cols 1&ndash;4 (row by row)</li>
-              <li>Bottom-Middle 13&times;5 &mdash; rows 1&ndash;13, cols 5&ndash;9</li>
-              <li>Bottom-Right 13&times;4 &mdash; rows 1&ndash;13, cols 10&ndash;13</li>
-              <li>Top-Left 12&times;4 &mdash; rows 14&ndash;25, cols 1&ndash;4</li>
-              <li>Top-Middle 12&times;5 &mdash; rows 14&ndash;25, cols 5&ndash;9</li>
-              <li>Top-Right 12&times;4 &mdash; rows 14&ndash;25, cols 10&ndash;13</li>
-            </ol>
-          )}
-        </div>
-      )}
-
-      {/* ── Barcode input (always shown, disabled while waiting for UPC) ── */}
+      {/* ── Barcode input ── */}
       <label className="keyence-field-label">Contact Barcode</label>
       <input
         ref={inputRef}
@@ -414,7 +368,7 @@ export default function KeyenceScanStep({ onBack }) {
         disabled={needsUpc}
       />
 
-      {/* ── UPC input — only appears for non-01 barcodes ── */}
+      {/* ── UPC input — only for non-01 barcodes ── */}
       {needsUpc && (
         <>
           <label className="keyence-field-label">Scan Contact UPC (12 digits)</label>
@@ -465,13 +419,6 @@ export default function KeyenceScanStep({ onBack }) {
         </button>
         {saveMsg && <p style={{ textAlign: 'center', color: '#2D8A72', fontSize: '0.85rem', margin: '4px 0 0' }}>{saveMsg}</p>}
       </div>
-
-      {/* ── Out-of-order warning ── */}
-      {orderWarning && (
-        <div className="keyence-scan-banner error" style={{ marginTop: 8 }}>
-          &#9888; {orderWarning}
-        </div>
-      )}
 
       {/* ── Tray grid ── */}
       <div className="keyence-tray-grid-container">
