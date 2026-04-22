@@ -311,7 +311,7 @@ export default function KeyenceScanStep({ onBack }) {
               height: `${gridHeight}px`,
             }}
           >
-            {grid.map((row) =>
+            {[...grid].reverse().map((row) =>
               row.map((cell) => (
                 <div key={`${cell.col}-${cell.row}`} className={`keyence-grid-cell ${getCellClass(cell)}`} />
               ))
@@ -433,7 +433,7 @@ export default function KeyenceScanStep({ onBack }) {
             height: `${gridHeight}px`,
           }}
         >
-          {grid.map((row) =>
+          {[...grid].reverse().map((row) =>
             row.map((cell) => (
               <div
                 key={`${cell.col}-${cell.row}`}
